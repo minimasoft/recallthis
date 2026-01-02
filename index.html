@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>High Compatibility Shader</title>
+    <title>High Compatibility Shader - Colliding Balls</title>
     <style>
         body { background-color: #002b36; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
         canvas { width: 800px; height: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); background-color: #073642; }
@@ -15,7 +15,6 @@
     attribute vec2 a_position;
     varying vec2 v_texCoord;
     void main() {
-        // Precise UV mapping
         v_texCoord = a_position * 0.5 + 0.5;
         v_texCoord.y = 1.0 - v_texCoord.y;
         gl_Position = vec4(a_position, 0.0, 1.0);
@@ -23,11 +22,14 @@
 </script>
 
 <script id="fragment-shader" type="x-shader/x-fragment">
-    // Using highp for maximum compatibility with mobile/integrated GPUs
     precision highp float;
     
+    #define NUM_BALLS 9
+
     uniform sampler2D u_textTexture;
     uniform float u_time;
+    uniform vec2 u_resolution;
+    uniform vec2 u_balls[NUM_BALLS]; 
     varying vec2 v_texCoord;
 
     vec3 base03 = vec3(0.17, 0.13, 0.11); 
@@ -38,20 +40,23 @@
     }
 
     void main() {
-        vec2 sampleCoord = v_texCoord;
-        
-        sampleCoord = clamp(sampleCoord, 0.0, 1.0);
-        
-        vec4 maskColor = texture2D(u_textTexture, sampleCoord);
-        
-        // High-frequency seed for dots
+        vec2 pixelCoord = v_texCoord * u_resolution;
         float seed = random(v_texCoord + fract(u_time));
+        
+        bool inBall = false;
+        for(int i = 0; i < NUM_BALLS; i++) {
+            if(distance(pixelCoord, u_balls[i]) < 16.0) {
+                inBall = true;
+                break;
+            }
+        }
 
-        // Logic checks
-        bool isPureNoise = seed < 0.0012;
-        // Check for ANY color in the mask (alpha or RGB) to be safe
+        float noiseProb = inBall ? 0.02 : 0.0012;
+        
+        vec4 maskColor = texture2D(u_textTexture, v_texCoord);
+        bool isPureNoise = seed < noiseProb;
         bool isInsideText = (maskColor.r > 0.5);
-        bool isTextDot = isInsideText && (seed < 0.027);
+        bool isTextDot = isInsideText && (seed < 0.023);
 
         if (isTextDot || isPureNoise) {
             gl_FragColor = vec4(brightDot, 1.0);
@@ -63,88 +68,130 @@
 
 <script>
 const canvas = document.getElementById('glCanvas');
+const gl = canvas.getContext('webgl', { alpha: false, depth: false }) || canvas.getContext('experimental-webgl');
 
-// Use a simple context fetch
-const gl = canvas.getContext('webgl', { 
-    alpha: false, 
-    depth: false, 
-    antialias: false,
-    preserveDrawingBuffer: false 
-}) || canvas.getContext('experimental-webgl');
+// 1. Configuration
+const NUM_BALLS = 9;
+const BALL_RADIUS = 16;
+const DIAMETER = BALL_RADIUS * 2;
 
-if (!gl) {
-    alert("WebGL not supported");
-}
-
-// 1. Build the text texture
+// 2. Build text texture
 const textSource = document.createElement('canvas');
-textSource.width = 800;
-textSource.height = 400;
+textSource.width = 800; textSource.height = 400;
 const tCtx = textSource.getContext('2d');
-tCtx.fillStyle = 'black'; // Clear background
-tCtx.fillRect(0,0,800,400);
-tCtx.fillStyle = 'white'; // Text color
-tCtx.textAlign = 'center';
-tCtx.textBaseline = 'middle';
+tCtx.fillStyle = 'black'; tCtx.fillRect(0,0,800,400);
+tCtx.fillStyle = 'white'; tCtx.textAlign = 'center'; tCtx.textBaseline = 'middle';
 tCtx.font = '900 70px "Courier New", monospace';
 tCtx.fillText('RECALL THIS:', 400, 140);
 tCtx.fillText('SATYA COME MOCO', 400, 260);
 
-// 2. Shader Compiling with basic Error Checking
-function createShader(gl, type, source) {
-    const shader = gl.createShader(type);
-    gl.shaderSource(shader, source);
-    gl.compileShader(shader);
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        console.error(gl.getShaderInfoLog(shader));
-        gl.deleteShader(shader);
-        return null;
-    }
-    return shader;
+// 3. Initialize Balls with no initial overlap
+const balls = [];
+for (let i = 0; i < NUM_BALLS; i++) {
+    balls.push({
+        x: Math.random() * (canvas.width - DIAMETER) + BALL_RADIUS,
+        y: Math.random() * (canvas.height - DIAMETER) + BALL_RADIUS,
+        vx: (Math.random() - 0.5) * 4,
+        vy: (Math.random() - 0.5) * 4
+    });
 }
 
-const vsSource = document.getElementById('vertex-shader').text;
-const fsSource = document.getElementById('fragment-shader').text;
-const vertexShader = createShader(gl, gl.VERTEX_SHADER, vsSource);
-const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
+function updateBalls() {
+    // Wall Collisions
+    balls.forEach(b => {
+        b.x += b.vx;
+        b.y += b.vy;
+        if (b.x < BALL_RADIUS) { b.x = BALL_RADIUS; b.vx *= -1; }
+        if (b.x > canvas.width - BALL_RADIUS) { b.x = canvas.width - BALL_RADIUS; b.vx *= -1; }
+        if (b.y < BALL_RADIUS) { b.y = BALL_RADIUS; b.vy *= -1; }
+        if (b.y > canvas.height - BALL_RADIUS) { b.y = canvas.height - BALL_RADIUS; b.vy *= -1; }
+    });
+
+    // Inter-ball Collisions (O(n^2) is fine for n=9)
+    for (let i = 0; i < balls.length; i++) {
+        for (let j = i + 1; j < balls.length; j++) {
+            let b1 = balls[i];
+            let b2 = balls[j];
+            let dx = b2.x - b1.x;
+            let dy = b2.y - b1.y;
+            let distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < DIAMETER) {
+                // 1. Static resolution: Push balls apart so they don't stick
+                let overlap = DIAMETER - distance;
+                let nx = dx / distance; // Normal X
+                let ny = dy / distance; // Normal Y
+                
+                b1.x -= nx * (overlap / 2);
+                b1.y -= ny * (overlap / 2);
+                b2.x += nx * (overlap / 2);
+                b2.y += ny * (overlap / 2);
+
+                // 2. Dynamic resolution: Elastic collision
+                // Dot product of velocity and normal
+                let v1n = b1.vx * nx + b1.vy * ny;
+                let v2n = b2.vx * nx + b2.vy * ny;
+
+                // Simple swap of normal velocities (assuming equal mass)
+                let impulse = v1n - v2n;
+                if (impulse > 0) { // Only collide if moving towards each other
+                    b1.vx -= impulse * nx;
+                    b1.vy -= impulse * ny;
+                    b2.vx += impulse * nx;
+                    b2.vy += impulse * ny;
+                }
+            }
+        }
+    }
+}
+
+// 4. Shader Program setup (Same as previous)
+function createShader(gl, type, source) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, source);
+    gl.compileShader(s);
+    return s;
+}
 
 const program = gl.createProgram();
-gl.attachShader(program, vertexShader);
-gl.attachShader(program, fragmentShader);
+gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, document.getElementById('vertex-shader').text));
+gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, document.getElementById('fragment-shader').text));
 gl.linkProgram(program);
 gl.useProgram(program);
 
-// Quad setup
 const buffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
 gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
-
 const posLoc = gl.getAttribLocation(program, 'a_position');
 gl.enableVertexAttribArray(posLoc);
 gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
-// Texture setup
 const tex = gl.createTexture();
 gl.bindTexture(gl.TEXTURE_2D, tex);
-// Use standard params for maximum compatibility
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textSource);
 
 const timeLoc = gl.getUniformLocation(program, 'u_time');
+const resLoc = gl.getUniformLocation(program, 'u_resolution');
+const ballsLoc = gl.getUniformLocation(program, 'u_balls');
 
 function render(ts) {
+    updateBalls();
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(0.0, 0.1686, 0.2117, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     gl.uniform1f(timeLoc, ts / 1000.0);
+    gl.uniform2f(resLoc, 800, 400);
+    
+    const ballData = new Float32Array(balls.flatMap(b => [b.x, b.y]));
+    gl.uniform2fv(ballsLoc, ballData);
+
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     requestAnimationFrame(render);
 }
-
 requestAnimationFrame(render);
 </script>
 </body>
