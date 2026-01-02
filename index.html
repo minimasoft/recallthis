@@ -38,16 +38,11 @@
     void main() {
         vec4 maskColor = texture2D(u_textTexture, v_texCoord);
         
-        // Use a high-frequency seed combining coordinates and time
         float seed = random(v_texCoord + fract(u_time));
 
-        // 1. Pure Noise Check (0.0011 density)
-        // This renders dots randomly across the entire canvas
         bool isPureNoise = seed < 0.0011;
 
-        // 2. Text Mask Check (~2% density)
-        // This renders dots only where the text buffer exists
-        float textDensity = 0.02;
+        float textDensity = 0.027;
         bool isTextDot = (maskColor.a > 0.5) && (seed < textDensity);
 
         if (isTextDot || isPureNoise) {
@@ -76,8 +71,8 @@ tCtx.fillStyle = 'white';
 tCtx.textAlign = 'center';
 tCtx.textBaseline = 'middle';
 tCtx.font = `900 ${70 * dpr}px "Courier New", monospace`;
-tCtx.fillText('RECALL THIS:', textSource.width / 2, textSource.height / 2-70);
-tCtx.fillText('SATYA COME MOCO', textSource.width / 2, textSource.height / 2+70);
+tCtx.fillText('RECALL THIS:', textSource.width / 2, textSource.height / 2-70*dpr);
+tCtx.fillText('SATYA COME MOCO', textSource.width / 2, textSource.height / 2+70*dpr);
 
 // --- WebGL Boilerplate ---
 function compileShader(gl, src, type) {
