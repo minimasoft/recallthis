@@ -112,7 +112,7 @@ void main(){
     const hiddenCanvas = document.createElement('canvas');
     const hiddenCtx = hiddenCanvas.getContext('2d');
     // Default font size as per design
-    const FONT_SIZE_PX = 64;
+    const FONT_SIZE_PX = 42;
     // Ensure the font size is applied each time before drawing
     function setFont(){
         hiddenCtx.font = `${FONT_SIZE_PX}px monospace`;
@@ -176,7 +176,7 @@ void main(){
         const repeatedLines = [];
         for(let i=0;i<10;i++) repeatedLines.push(SAMPLE_TEXT); // repeat sample text 10 times
         hiddenCtx.fillStyle = "#ff0000"; // render text in red for shader sampling
-        let y = 10; // start a bit lower to be visible
+        let y = FONT_SIZE_PX; // start one line height lower to be visible
         // Render from current start line, stop when out of canvas height
         for(let i=textStartLine; i<repeatedLines.length && y+FONT_SIZE_PX<=hiddenCanvas.height; i++){
             hiddenCtx.fillText(repeatedLines[i], 0, y);
@@ -270,7 +270,7 @@ function resize(){
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     // Set default probabilities
     gl.useProgram(program);
-    gl.uniform1f(uDataProbLocation, 0.5);
+    gl.uniform1f(uDataProbLocation, 0.05);
     gl.uniform1f(uNoiseProbLocation, 0.001);
     gl.uniform1f(uBallProbLocation, 0.02); // ball probability boost
     const vertices = new Float32Array([
