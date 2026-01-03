@@ -170,16 +170,14 @@ void main(){
         hiddenCtx.clearRect(0,0,hiddenCanvas.width, hiddenCanvas.height);
         // Ensure font is set (in case context reset)
         setFont();
-        // Disable wrapping for testing: repeat the same line multiple times
-        // const maxWidth = hiddenCanvas.width;
-        // const allLines = wrapText(SAMPLE_TEXT, maxWidth);
-        const repeatedLines = [];
-        for(let i=0;i<10;i++) repeatedLines.push(SAMPLE_TEXT); // repeat sample text 10 times
+        // Enable wrapping: compute lines from the sample text
+        const maxWidth = hiddenCanvas.width;
+        const wrappedLines = wrapText(SAMPLE_TEXT, maxWidth);
         hiddenCtx.fillStyle = "#ff0000"; // render text in red for shader sampling
         let y = FONT_SIZE_PX; // start one line height lower to be visible
-        // Render from current start line, stop when out of canvas height
-        for(let i=textStartLine; i<repeatedLines.length && y+FONT_SIZE_PX<=hiddenCanvas.height; i++){
-            hiddenCtx.fillText(repeatedLines[i], 0, y);
+        // Render each wrapped line from the current start line
+        for(let i=textStartLine; i<wrappedLines.length && y+FONT_SIZE_PX<=hiddenCanvas.height; i++){
+            hiddenCtx.fillText(wrappedLines[i], 0, y);
             y += FONT_SIZE_PX;
         }
     }
@@ -270,7 +268,7 @@ function resize(){
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     // Set default probabilities
     gl.useProgram(program);
-    gl.uniform1f(uDataProbLocation, 0.05);
+    gl.uniform1f(uDataProbLocation, 0.033);
     gl.uniform1f(uNoiseProbLocation, 0.001);
     gl.uniform1f(uBallProbLocation, 0.02); // ball probability boost
     const vertices = new Float32Array([
