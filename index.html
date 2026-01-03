@@ -19,17 +19,17 @@ html, body {
 /* Portrait layout */
 @media (orientation: portrait) {
     #glcanvas {
-        width: 90vw;      /* 90% of viewport width */
-        height: 80vh;     /* 80% of viewport height */
-        margin-top: 5vw;  /* top padding */
+        width: 94vw;
+        height: 100vh;
+        margin: auto;
     }
 }
 /* Landscape layout */
 @media (orientation: landscape) {
     #glcanvas {
-        width: 60vw;      /* 60% of viewport width */
-        height: 90vh;     /* 90% of viewport height */
-        margin: auto;   /* center horizontally and vertically */
+        width: 60vw;
+        height: 100vh;
+        margin: auto;
     }
 }
 </style>
@@ -112,7 +112,7 @@ void main(){
     const hiddenCanvas = document.createElement('canvas');
     const hiddenCtx = hiddenCanvas.getContext('2d');
     // Default font size as per design
-    const FONT_SIZE_PX = 42;
+    const FONT_SIZE_PX = 36;
     // Ensure the font size is applied each time before drawing
     function setFont(){
         hiddenCtx.font = `${FONT_SIZE_PX}px monospace`;
@@ -153,7 +153,7 @@ void main(){
 
     // ----- Bouncy ball configuration -----
     const BALL_COUNT = 9;               // maximum balls as per design
-    const BALL_RADIUS = 10.0;           // back to design size
+    const BALL_RADIUS = 18.0;           // back to design size
     let canvasWidth = 0;
     let canvasHeight = 0;
     const ballPos = new Array(BALL_COUNT).fill([0,0]);
@@ -176,8 +176,8 @@ void main(){
 
 "Well, then, do you notice the framed statement I have on the wall behind me? Read it, if you will! 
 
-
-Sermak's lips twitched. "It says: 'Violence is the last refuge of the incompetent.' That's an old man's doctrine, Mr. Mayor." `;
+Sermak's lips twitched. "It says:
+'Violence is the last refuge of the incompetent.'  That's an old man's doctrine, Mr. Mayor." `;
 
     function renderTextBuffer(){
         // Clear with transparent background
@@ -282,9 +282,9 @@ function resize(){
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     // Set default probabilities
     gl.useProgram(program);
-    gl.uniform1f(uDataProbLocation, 0.033);
-    gl.uniform1f(uNoiseProbLocation, 0.001);
-    gl.uniform1f(uBallProbLocation, 0.02); // ball probability boost
+    gl.uniform1f(uDataProbLocation, 0.031);
+    gl.uniform1f(uNoiseProbLocation, 0.0011);
+    gl.uniform1f(uBallProbLocation, 0.023); // ball probability boost
     const vertices = new Float32Array([
         -1, -1,
          1, -1,
