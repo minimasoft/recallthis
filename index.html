@@ -168,13 +168,15 @@ void main(){
     function renderTextBuffer(){
         // Clear with transparent background
         hiddenCtx.clearRect(0,0,hiddenCanvas.width, hiddenCanvas.height);
+        // Ensure font is set (in case context reset)
+        setFont();
         // Disable wrapping for testing: repeat the same line multiple times
         // const maxWidth = hiddenCanvas.width;
         // const allLines = wrapText(SAMPLE_TEXT, maxWidth);
         const repeatedLines = [];
         for(let i=0;i<10;i++) repeatedLines.push(SAMPLE_TEXT); // repeat sample text 10 times
         hiddenCtx.fillStyle = "#ff0000"; // render text in red for shader sampling
-        let y = 0;
+        let y = 10; // start a bit lower to be visible
         // Render from current start line, stop when out of canvas height
         for(let i=textStartLine; i<repeatedLines.length && y+FONT_SIZE_PX<=hiddenCanvas.height; i++){
             hiddenCtx.fillText(repeatedLines[i], 0, y);
