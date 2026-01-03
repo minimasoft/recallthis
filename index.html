@@ -282,7 +282,7 @@ function resize(){
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     // Set default probabilities
     gl.useProgram(program);
-    gl.uniform1f(uDataProbLocation, 0.031);
+    gl.uniform1f(uDataProbLocation, 0.037);
     gl.uniform1f(uNoiseProbLocation, 0.0011);
     gl.uniform1f(uBallProbLocation, 0.023); // ball probability boost
     const vertices = new Float32Array([
