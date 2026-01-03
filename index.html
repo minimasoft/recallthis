@@ -1,198 +1,222 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>High Compatibility Shader - Colliding Balls</title>
-    <style>
-        body { background-color: #002b36; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        canvas { width: 800px; height: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); background-color: #073642; }
-    </style>
+<meta charset="UTF-8">
+<title>Recall This</title>
+<style>
+html, body {
+    margin: 0;
+    height: 100%;
+    background: #000; /* black page */
+    overflow: hidden;
+}
+#glcanvas {
+    display: block;
+    background: #000;
+    /* Size will be set by media queries */
+    margin: auto;
+}
+/* Portrait layout */
+@media (orientation: portrait) {
+    #glcanvas {
+        width: 90vw;      /* 90% of viewport width */
+        height: 60vh;     /* 60% of viewport height */
+        margin-top: 5vw;  /* top padding */
+    }
+}
+/* Landscape layout */
+@media (orientation: landscape) {
+    #glcanvas {
+        width: 60vw;      /* 60% of viewport width */
+        height: 90vh;     /* 90% of viewport height */
+        margin-right: 5vh;/* right padding */
+    }
+}
+</style>
 </head>
 <body>
-<canvas id="glCanvas" width="800" height="400"></canvas>
-
-<script id="vertex-shader" type="x-shader/x-vertex">
-    attribute vec2 a_position;
-    varying vec2 v_texCoord;
-    void main() {
-        v_texCoord = a_position * 0.5 + 0.5;
-        v_texCoord.y = 1.0 - v_texCoord.y;
-        gl_Position = vec4(a_position, 0.0, 1.0);
-    }
+<canvas id="glcanvas"></canvas>
+<script type="x-shader/x-vertex" id="vertex-shader">
+attribute vec2 a_position;
+varying vec2 v_uv;
+void main(){
+  v_uv = (a_position + 1.0) * 0.5;
+  gl_Position = vec4(a_position, 0.0, 1.0);
+}
 </script>
+<script type="x-shader/x-fragment" id="fragment-shader">
+precision highp float;
+uniform float u_seed;
+uniform vec2 u_resolution;
 
-<script id="fragment-shader" type="x-shader/x-fragment">
-    precision highp float;
-    
-    #define NUM_BALLS 9
+// Ball constants (hard‑coded for simplicity)
+const int BALL_COUNT = 9;
+uniform vec2 u_ballPos[BALL_COUNT];
+uniform float u_ballRadius;
 
-    uniform sampler2D u_textTexture;
-    uniform float u_time;
-    uniform vec2 u_resolution;
-    uniform vec2 u_balls[NUM_BALLS]; 
-    varying vec2 v_texCoord;
+varying vec2 v_uv;
 
-    vec3 base03 = vec3(0.17, 0.13, 0.11); 
-    vec3 brightDot = vec3(0.77, 0.77, 0.77);   
+float hash(vec2 p) {
+    return fract(sin(dot(p.xy, vec2(12.9898,78.233))) * 43758.54537);
+}
 
-    float random(vec2 st) {
-        return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+void main(){
+    // Base dark green background
+    vec4 baseColor = vec4(0.0, 14.0/255.0, 0.0, 1.0);
+    // Noise layer (light green speckles)
+    vec2 coord = v_uv + fract(u_seed);
+    float n = hash(coord);
+    float noiseThresh = 0.00007;
+    vec4 color = baseColor;
+    if (n < noiseThresh) {
+        color = vec4(10.0/255.0, 250.0/255.0, 10.0/255.0, 1.0);
     }
-
-    void main() {
-        vec2 pixelCoord = v_texCoord * u_resolution;
-        float seed = random(v_texCoord + fract(u_time));
-        
-        bool inBall = false;
-        for(int i = 0; i < NUM_BALLS; i++) {
-            if(distance(pixelCoord, u_balls[i]) < 16.0) {
-                inBall = true;
-                break;
-            }
-        }
-
-        float noiseProb = inBall ? 0.02 : 0.0012;
-        
-        vec4 maskColor = texture2D(u_textTexture, v_texCoord);
-        bool isPureNoise = seed < noiseProb;
-        bool isInsideText = (maskColor.r > 0.5);
-        bool isTextDot = isInsideText && (seed < 0.023);
-
-        if (isTextDot || isPureNoise) {
-            gl_FragColor = vec4(brightDot, 1.0);
-        } else {
-            gl_FragColor = vec4(base03, 1.0);
+    // Bouncy ball rendering
+    // Convert fragment coordinate to pixel space for distance calculation
+    vec2 pixCoord = v_uv * u_resolution; // [0,width] x [0,height]
+    for (int i = 0; i < 9; ++i) {
+        vec2 ballCenter = u_ballPos[i] * u_resolution; // normalized positions scaled to pixels
+        float dist = length(pixCoord - ballCenter);
+        if (dist < u_ballRadius) {
+            // Ball color (distinct from noise)
+            color = vec4(250.0/255.0, 150.0/255.0, 10.0/255.0, 1.0);
         }
     }
+    gl_FragColor = color;
+}
 </script>
-
 <script>
-const canvas = document.getElementById('glCanvas');
-const gl = canvas.getContext('webgl', { alpha: false, depth: false }) || canvas.getContext('experimental-webgl');
+// Basic WebGL setup – blank shader rendering with dark green background and light‑green noise.
+(function(){
+    const canvas = document.getElementById('glcanvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (!gl) {
+        console.error('WebGL not supported');
+        return;
+    }
+    let uResLocation = null;
 
-// 1. Configuration
-const NUM_BALLS = 9;
-const BALL_RADIUS = 16;
-const DIAMETER = BALL_RADIUS * 2;
+    // ----- Bouncy ball configuration -----
+    const BALL_COUNT = 9;               // maximum balls as per design
+    const BALL_RADIUS = 10.0;           // back to design size
+    let canvasWidth = 0;
+    let canvasHeight = 0;
+    const ballPos = new Array(BALL_COUNT).fill([0,0]);
+    const ballVel = new Array(BALL_COUNT).fill([0,0]);
 
-// 2. Build text texture
-const textSource = document.createElement('canvas');
-textSource.width = 800; textSource.height = 400;
-const tCtx = textSource.getContext('2d');
-tCtx.fillStyle = 'black'; tCtx.fillRect(0,0,800,400);
-tCtx.fillStyle = 'white'; tCtx.textAlign = 'center'; tCtx.textBaseline = 'middle';
-tCtx.font = '900 70px "Courier New", monospace';
-tCtx.fillText('RECALL THIS:', 400, 140);
-tCtx.fillText('SATYA COME MOCO', 400, 260);
-
-// 3. Initialize Balls with no initial overlap
-const balls = [];
-for (let i = 0; i < NUM_BALLS; i++) {
-    balls.push({
-        x: Math.random() * (canvas.width - DIAMETER) + BALL_RADIUS,
-        y: Math.random() * (canvas.height - DIAMETER) + BALL_RADIUS,
-        vx: (Math.random() - 0.5) * 4,
-        vy: (Math.random() - 0.5) * 4
-    });
-}
-
-function updateBalls() {
-    // Wall Collisions
-    balls.forEach(b => {
-        b.x += b.vx;
-        b.y += b.vy;
-        if (b.x < BALL_RADIUS) { b.x = BALL_RADIUS; b.vx *= -1; }
-        if (b.x > canvas.width - BALL_RADIUS) { b.x = canvas.width - BALL_RADIUS; b.vx *= -1; }
-        if (b.y < BALL_RADIUS) { b.y = BALL_RADIUS; b.vy *= -1; }
-        if (b.y > canvas.height - BALL_RADIUS) { b.y = canvas.height - BALL_RADIUS; b.vy *= -1; }
-    });
-
-    // Inter-ball Collisions (O(n^2) is fine for n=9)
-    for (let i = 0; i < balls.length; i++) {
-        for (let j = i + 1; j < balls.length; j++) {
-            let b1 = balls[i];
-            let b2 = balls[j];
-            let dx = b2.x - b1.x;
-            let dy = b2.y - b1.y;
-            let distance = Math.sqrt(dx * dx + dy * dy);
-
-            if (distance < DIAMETER) {
-                // 1. Static resolution: Push balls apart so they don't stick
-                let overlap = DIAMETER - distance;
-                let nx = dx / distance; // Normal X
-                let ny = dy / distance; // Normal Y
-                
-                b1.x -= nx * (overlap / 2);
-                b1.y -= ny * (overlap / 2);
-                b2.x += nx * (overlap / 2);
-                b2.y += ny * (overlap / 2);
-
-                // 2. Dynamic resolution: Elastic collision
-                // Dot product of velocity and normal
-                let v1n = b1.vx * nx + b1.vy * ny;
-                let v2n = b2.vx * nx + b2.vy * ny;
-
-                // Simple swap of normal velocities (assuming equal mass)
-                let impulse = v1n - v2n;
-                if (impulse > 0) { // Only collide if moving towards each other
-                    b1.vx -= impulse * nx;
-                    b1.vy -= impulse * ny;
-                    b2.vx += impulse * nx;
-                    b2.vy += impulse * ny;
-                }
-            }
+    function initBalls(){
+        // initialize positions inside the viewport and random velocities
+        for(let i=0;i<BALL_COUNT;i++){
+            ballPos[i] = [Math.random()*canvasWidth, Math.random()*canvasHeight];
+            const speed = 100 + Math.random()*200; // pixels per second
+            const angle = Math.random()*2*Math.PI;
+            ballVel[i] = [Math.cos(angle)*speed, Math.sin(angle)*speed];
         }
     }
-}
 
-// 4. Shader Program setup (Same as previous)
-function createShader(gl, type, source) {
-    const s = gl.createShader(type);
-    gl.shaderSource(s, source);
-    gl.compileShader(s);
-    return s;
-}
+    function updateBalls(dt){
+        for(let i=0;i<BALL_COUNT;i++){
+            let x = ballPos[i][0] + ballVel[i][0]*dt;
+            let y = ballPos[i][1] + ballVel[i][1]*dt;
+            // bounce off edges
+            if (x < BALL_RADIUS) { x = BALL_RADIUS; ballVel[i][0] *= -1; }
+            else if (x > canvasWidth - BALL_RADIUS){ x = canvasWidth - BALL_RADIUS; ballVel[i][0] *= -1; }
+            if (y < BALL_RADIUS) { y = BALL_RADIUS; ballVel[i][1] *= -1; }
+            else if (y > canvasHeight - BALL_RADIUS){ y = canvasHeight - BALL_RADIUS; ballVel[i][1] *= -1; }
+            ballPos[i][0] = x;
+            ballPos[i][1] = y;
+        }
+    }
 
-const program = gl.createProgram();
-gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, document.getElementById('vertex-shader').text));
-gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, document.getElementById('fragment-shader').text));
-gl.linkProgram(program);
-gl.useProgram(program);
+    // Uniform locations for ball data (retrieved after program linking)
+    // uBallCountLocation not needed (ball count is a shader constant)
+    let uBallPosLocation = null;
+    let uBallRadiusLocation = null;
+function resize(){
+        canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        // store dimensions for ball physics
+        canvasWidth = canvas.width;
+        canvasHeight = canvas.height;
+        // initialize balls on first resize (canvas size known)
+        if (!ballPos[0][0]) { initBalls(); }
+        // update resolution uniform for shader
+        if (uResLocation) {
+            gl.uniform2f(uResLocation, canvas.width, canvas.height);
+        }
+    }
+    window.addEventListener('resize', resize);
+    resize();
+    const vsSource = document.getElementById('vertex-shader').textContent;
+    const fsSource = document.getElementById('fragment-shader').textContent;
+    function compile(type, source){
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            console.error('Shader compile error:', gl.getShaderInfoLog(shader));
+            gl.deleteShader(shader);
+            return null;
+        }
+        return shader;
+    }
+    const vertexShader = compile(gl.VERTEX_SHADER, vsSource);
+    const fragmentShader = compile(gl.FRAGMENT_SHADER, fsSource);
+    const program = gl.createProgram();
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error('Program link error:', gl.getProgramInfoLog(program));
+        return;
+    }
+    gl.useProgram(program);
+    // Get uniform locations for seed and resolution
+    const uSeedLocation = gl.getUniformLocation(program, 'u_seed');
+    uResLocation = gl.getUniformLocation(program, 'u_resolution');
+    // Get uniform locations for bouncy balls (count is a shader constant)
+    // uBallCountLocation not needed
+    uBallPosLocation = gl.getUniformLocation(program, 'u_ballPos[0]');
+    uBallRadiusLocation = gl.getUniformLocation(program, 'u_ballRadius');
+    const vertices = new Float32Array([
+        -1, -1,
+         1, -1,
+        -1,  1,
+        -1,  1,
+         1, -1,
+         1,  1
+    ]);
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(program, 'a_position');
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+function render(){
+        const now = performance.now() / 1000;
+        const dt = now - (render.lastTime || now);
+        render.lastTime = now;
+        // Update ball physics
+        updateBalls(dt);
+        // Set uniforms for balls (count is a shader constant)
+        const posArray = new Float32Array(9 * 2);
+        for (let i = 0; i < BALL_COUNT; ++i) {
+            posArray[i*2] = ballPos[i][0];
+            posArray[i*2+1] = ballPos[i][1];
+        }
+        gl.uniform2fv(uBallPosLocation, posArray);
+        gl.uniform1f(uBallRadiusLocation, BALL_RADIUS);
 
-const buffer = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
-const posLoc = gl.getAttribLocation(program, 'a_position');
-gl.enableVertexAttribArray(posLoc);
-gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
-
-const tex = gl.createTexture();
-gl.bindTexture(gl.TEXTURE_2D, tex);
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textSource);
-
-const timeLoc = gl.getUniformLocation(program, 'u_time');
-const resLoc = gl.getUniformLocation(program, 'u_resolution');
-const ballsLoc = gl.getUniformLocation(program, 'u_balls');
-
-function render(ts) {
-    updateBalls();
-    gl.viewport(0, 0, canvas.width, canvas.height);
-    gl.clearColor(0.0, 0.1686, 0.2117, 1.0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-
-    gl.uniform1f(timeLoc, ts / 1000.0);
-    gl.uniform2f(resLoc, 800, 400);
-    
-    const ballData = new Float32Array(balls.flatMap(b => [b.x, b.y]));
-    gl.uniform2fv(ballsLoc, ballData);
-
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-    requestAnimationFrame(render);
-}
-requestAnimationFrame(render);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        let seed = now * 0.001;
+        seed = seed - Math.floor(seed);
+        gl.uniform1f(uSeedLocation, seed);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        requestAnimationFrame(render);
+    }
+    render();
+})();
 </script>
 </body>
 </html>
