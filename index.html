@@ -48,6 +48,10 @@ void main(){
 precision highp float;
 uniform float u_seed;
 uniform vec2 u_resolution;
+uniform sampler2D u_textTex; // hidden text buffer
+uniform float u_dataProb;   // probability boost for text pixels (default 0.02)
+uniform float u_noiseProb;
+uniform float u_ballProb; // ball probability boost (default 0.02)
 
 // Ball constants (hard‑coded for simplicity)
 const int BALL_COUNT = 9;
@@ -66,26 +70,28 @@ void main(){
     vec4 baseColor = vec4(0.0, 14.0/255.0, 0.0, 1.0);
     // Noise layer (light green speckles)
     // Mix normalized coordinates with time seed for better variation
-    vec2 coord = (v_uv) + vec2(u_seed, u_seed);
+    vec2 coord = v_uv + vec2(u_seed, u_seed);
     float n = hash(coord);
-    float noiseThresh = 0.00007;
+    // Sample hidden text texture (red channel holds the rendered text as white on black)
+    float texVal = texture2D(u_textTex, vec2(v_uv.x, 1.0 - v_uv.y)).r;
+    // Base probability always present
+    float prob = u_noiseProb;
+    // Add text contribution if texVal indicates a text pixel (value ~1.0)
+    prob += texVal * u_dataProb;
     vec4 color = baseColor;
-    if (n < noiseThresh) {
-        color = vec4(10.0/255.0, 250.0/255.0, 10.0/255.0, 1.0);
-    }
     // Bouncy ball rendering
-    // Use actual pixel coordinates from gl_FragCoord
     vec2 pixCoord = gl_FragCoord.xy;
-    float probAdd = 0.0; // extra probability boost when inside a ball
+    float ballProbAdd = 0.0;
     for (int i = 0; i < 9; ++i) {
-        vec2 ballCenter = u_ballPos[i]; // pixel coordinates
+        vec2 ballCenter = u_ballPos[i];
         float dist = length(pixCoord - ballCenter);
         if (dist < u_ballRadius) {
-            probAdd = 0.03; // increase chance of light color
+            ballProbAdd = u_ballProb;
         }
     }
-    // Apply noise threshold with possible boost from balls
-    if (n < noiseThresh + probAdd) {
+    // Combine probabilities
+    prob += ballProbAdd;
+    if (n < prob) {
         color = vec4(10.0/255.0, 250.0/255.0, 10.0/255.0, 1.0);
     }
     gl_FragColor = color;
@@ -102,6 +108,42 @@ void main(){
     }
     let uResLocation = null;
 
+    // Off‑screen 2D canvas for text rendering (hidden buffer)
+    const hiddenCanvas = document.createElement('canvas');
+    const hiddenCtx = hiddenCanvas.getContext('2d');
+    // Default font size as per design
+    const FONT_SIZE_PX = 64;
+    // Ensure the font size is applied each time before drawing
+    function setFont(){
+        hiddenCtx.font = `${FONT_SIZE_PX}px monospace`;
+    }
+    setFont();
+    hiddenCtx.textBaseline = 'top';
+    // Pagination state
+    let textStartLine = 0;
+
+    /**
+     * Wrap a given text to fit within maxWidth (in pixels).
+     * Returns an array of line strings.
+     */
+    function wrapText(text, maxWidth) {
+        const words = text.split(/\s+/);
+        const lines = [];
+        let line = '';
+        for (const word of words) {
+            const testLine = line ? line + ' ' + word : word;
+            const metrics = hiddenCtx.measureText(testLine);
+            if (metrics.width > maxWidth && line) {
+                lines.push(line);
+                line = word;
+            } else {
+                line = testLine;
+            }
+        }
+        if (line) lines.push(line);
+        return lines;
+    }
+
     // ----- Bouncy ball configuration -----
     const BALL_COUNT = 9;               // maximum balls as per design
     const BALL_RADIUS = 10.0;           // back to design size
@@ -117,6 +159,26 @@ void main(){
             const speed = 100 + Math.random()*200; // pixels per second
             const angle = Math.random()*2*Math.PI;
             ballVel[i] = [Math.cos(angle)*speed, Math.sin(angle)*speed];
+        }
+    }
+
+    // ----- Text buffer rendering -----
+    const SAMPLE_TEXT = "It was a bright cold day in the year 2175 when humanity finally succeeded in recalling what it had once forgotten. The stars seemed nearer than ever before.";
+
+    function renderTextBuffer(){
+        // Clear with transparent background
+        hiddenCtx.clearRect(0,0,hiddenCanvas.width, hiddenCanvas.height);
+        // Disable wrapping for testing: repeat the same line multiple times
+        // const maxWidth = hiddenCanvas.width;
+        // const allLines = wrapText(SAMPLE_TEXT, maxWidth);
+        const repeatedLines = [];
+        for(let i=0;i<10;i++) repeatedLines.push(SAMPLE_TEXT); // repeat sample text 10 times
+        hiddenCtx.fillStyle = "#ff0000"; // render text in red for shader sampling
+        let y = 0;
+        // Render from current start line, stop when out of canvas height
+        for(let i=textStartLine; i<repeatedLines.length && y+FONT_SIZE_PX<=hiddenCanvas.height; i++){
+            hiddenCtx.fillText(repeatedLines[i], 0, y);
+            y += FONT_SIZE_PX;
         }
     }
 
@@ -151,6 +213,10 @@ function resize(){
         if (uResLocation) {
             gl.uniform2f(uResLocation, canvas.width, canvas.height);
         }
+        // Prepare hidden text buffer
+        hiddenCanvas.width = canvasWidth;
+        hiddenCanvas.height = canvasHeight;
+        renderTextBuffer();
     }
     window.addEventListener('resize', resize);
     resize();
@@ -185,6 +251,26 @@ function resize(){
     // uBallCountLocation not needed
     uBallPosLocation = gl.getUniformLocation(program, 'u_ballPos[0]');
     uBallRadiusLocation = gl.getUniformLocation(program, 'u_ballRadius');
+    // New uniforms for text texture and probabilities
+    const uTextTexLocation = gl.getUniformLocation(program, 'u_textTex');
+    const uDataProbLocation = gl.getUniformLocation(program, 'u_dataProb');
+    const uNoiseProbLocation = gl.getUniformLocation(program, 'u_noiseProb');
+    const uBallProbLocation = gl.getUniformLocation(program, 'u_ballProb'); // probability boost for balls
+    // Texture for hidden text buffer
+    const textTexture = gl.createTexture();
+    // Disable vertical flip to keep canvas top-down orientation
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    // Set texture parameters (no mipmaps, nearest filtering)
+    gl.bindTexture(gl.TEXTURE_2D, textTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    // Set default probabilities
+    gl.useProgram(program);
+    gl.uniform1f(uDataProbLocation, 0.5);
+    gl.uniform1f(uNoiseProbLocation, 0.001);
+    gl.uniform1f(uBallProbLocation, 0.02); // ball probability boost
     const vertices = new Float32Array([
         -1, -1,
          1, -1,
@@ -214,8 +300,15 @@ function render(){
         gl.uniform2fv(uBallPosLocation, posArray);
         gl.uniform1f(uBallRadiusLocation, BALL_RADIUS);
 
+        // Upload hidden text canvas as texture each frame (or when changed)
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, textTexture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, hiddenCanvas);
+        // Bind texture unit to sampler uniform
+        gl.uniform1i(uTextTexLocation, 0);
+
         gl.clear(gl.COLOR_BUFFER_BIT);
-        let seed = performance.now()/1337.0
+        let seed = performance.now()/1337.0;
         seed = seed - Math.floor(seed);
         gl.uniform1f(uSeedLocation, seed);
         gl.drawArrays(gl.TRIANGLES, 0, 6);

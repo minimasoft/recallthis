@@ -39,12 +39,11 @@ In landscape it's 60% screen width, 90% screen height, centered vertically and h
 
 Text rendering:
 
-Text data is set to a variable for now, it should contain this design document as test.
+Text data is set to a variable for now, it should contain a fragment of asimov works or similar as example.
 Text is rendered by lines and line-wrapped. 
 We render starting from the first line until the screen is filled.
 Text is first wrapped to current widht and then prepared in lines to render. 
 In the future the starting line will change for pagination so keep this in mind in the logic.
 
 Page background should be full black. 
-
 
