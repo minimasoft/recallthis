@@ -59,7 +59,7 @@ function startApp(){
     let uResLocation=null;
     const hiddenCanvas=document.createElement('canvas');
     const hiddenCtx=hiddenCanvas.getContext('2d');
-    const FONT_SIZE_PX=42;
+    const FONT_SIZE_PX=40;
     function setFont(){ hiddenCtx.font=`${FONT_SIZE_PX}px monospace`; }
     setFont();
     hiddenCtx.textBaseline='top';
@@ -91,11 +91,7 @@ function startApp(){
             ballVel[i]=[Math.cos(angle)*speed, Math.sin(angle)*speed];
         }
     }
-    const SAMPLE_TEXT=`"Are you finished?"
-
-"For the moment."
-
-"Well, then, do you notice the framed statement I have on the wall behind me? Read it, if you will!\n\nSermak's lips twitched. \"It says:\n'Violence is the last refuge of the incompetent.'  That's an old man's doctrine, Mr. Mayor.\"`;
+    const SAMPLE_TEXT=`¿Cómo vas a tener un slogan como el de «la libertad es la esclavitud» cuando el concepto de libertad no exista?\n\nTodo el clima del pensamiento será distinto.\n\n En realidad, no habrá pensamiento en el sentido en que ahora lo entendemos.\n\nLa ortodoxia significa no pensar, no necesitar el pensamiento.\n\nNuestra ortodoxia es la inconsciencia.`;
     function renderTextBuffer(){
         hiddenCtx.clearRect(0,0,hiddenCanvas.width,hiddenCanvas.height);
         setFont();
