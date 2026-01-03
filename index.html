@@ -127,21 +127,28 @@ void main(){
      * Returns an array of line strings.
      */
     function wrapText(text, maxWidth) {
-        const words = text.split(/\s+/);
-        const lines = [];
-        let line = '';
-        for (const word of words) {
-            const testLine = line ? line + ' ' + word : word;
-            const metrics = hiddenCtx.measureText(testLine);
-            if (metrics.width > maxWidth && line) {
-                lines.push(line);
-                line = word;
-            } else {
-                line = testLine;
+        const rawLines = text.split('\n');
+        const result = [];
+        for (let raw of rawLines) {
+            if (raw === '') { // preserve empty lines
+                result.push('');
+                continue;
             }
+            const words = raw.split(/\s+/);
+            let line = '';
+            for (const word of words) {
+                const testLine = line ? line + ' ' + word : word;
+                const metrics = hiddenCtx.measureText(testLine);
+                if (metrics.width > maxWidth && line) {
+                    result.push(line);
+                    line = word;
+                } else {
+                    line = testLine;
+                }
+            }
+            if (line) result.push(line);
         }
-        if (line) lines.push(line);
-        return lines;
+        return result;
     }
 
     // ----- Bouncy ball configuration -----
@@ -163,7 +170,14 @@ void main(){
     }
 
     // ----- Text buffer rendering -----
-    const SAMPLE_TEXT = "It was a bright cold day in the year 2175 when humanity finally succeeded in recalling what it had once forgotten. The stars seemed nearer than ever before.";
+    const SAMPLE_TEXT = `"Are you finished?" 
+
+"For the moment." 
+
+"Well, then, do you notice the framed statement I have on the wall behind me? Read it, if you will! 
+
+
+Sermak's lips twitched. "It says: 'Violence is the last refuge of the incompetent.' That's an old man's doctrine, Mr. Mayor." `;
 
     function renderTextBuffer(){
         // Clear with transparent background
@@ -172,12 +186,12 @@ void main(){
         setFont();
         // Enable wrapping: compute lines from the sample text
         const maxWidth = hiddenCanvas.width;
-        const wrappedLines = wrapText(SAMPLE_TEXT, maxWidth);
+        const wrappedLines = wrapText(SAMPLE_TEXT, maxWidth-20);
         hiddenCtx.fillStyle = "#ff0000"; // render text in red for shader sampling
-        let y = FONT_SIZE_PX; // start one line height lower to be visible
+        let y = FONT_SIZE_PX+10; // start one line height lower to be visible
         // Render each wrapped line from the current start line
         for(let i=textStartLine; i<wrappedLines.length && y+FONT_SIZE_PX<=hiddenCanvas.height; i++){
-            hiddenCtx.fillText(wrappedLines[i], 0, y);
+            hiddenCtx.fillText(wrappedLines[i], 10, y);
             y += FONT_SIZE_PX;
         }
     }
