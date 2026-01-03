@@ -46,7 +46,12 @@ void main(){
     float prob = u_noiseProb + texVal * u_dataProb;
     vec4 color = baseColor;
     vec2 pixCoord = gl_FragCoord.xy;
-    for(int i=0;i<BALL_COUNT;++i){ if(length(pixCoord - u_ballPos[i]) < u_ballRadius) { prob += u_ballProb; } }
+    for(int i=0;i<BALL_COUNT;++i){
+        float dist = length(pixCoord - u_ballPos[i]);
+        if(dist < u_ballRadius){
+            prob += u_ballProb * (1.0 / max(1.0, dist/3.14159));
+        }
+    }
     if(n < prob) { color = vec4(10.0/255.0,250.0/255.0,10.0/255.0,1.0); }
     gl_FragColor = color;
 }
@@ -79,7 +84,7 @@ function startApp(){
         }
         return result;
     }
-    const BALL_COUNT=9, BALL_RADIUS=18.0;
+    const BALL_COUNT=9, BALL_RADIUS=37.0;
     let canvasWidth=0,canvasHeight=0;
     const ballPos=new Array(BALL_COUNT).fill([0,0]);
     const ballVel=new Array(BALL_COUNT).fill([0,0]);
@@ -173,7 +178,7 @@ function startApp(){
         gl.useProgram(program);
         gl.uniform1f(uDataProbLocation,0.037);
         gl.uniform1f(uNoiseProbLocation,0.0011);
-        gl.uniform1f(uBallProbLocation,0.023);
+        gl.uniform1f(uBallProbLocation,0.079);
         return {
             program,
             uSeedLocation,
@@ -213,7 +218,7 @@ function startApp(){
     gl.useProgram(program);
     gl.uniform1f(uDataProbLocation,0.037);
     gl.uniform1f(uNoiseProbLocation,0.0011);
-    gl.uniform1f(uBallProbLocation,0.023);
+    gl.uniform1f(uBallProbLocation,0.029);
     const vertices=new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]);
     const buffer=gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
