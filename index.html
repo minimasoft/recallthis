@@ -72,15 +72,19 @@ void main(){
         color = vec4(10.0/255.0, 250.0/255.0, 10.0/255.0, 1.0);
     }
     // Bouncy ball rendering
-    // Convert fragment coordinate to pixel space for distance calculation
-    vec2 pixCoord = v_uv * u_resolution; // [0,width] x [0,height]
+    // Use actual pixel coordinates from gl_FragCoord
+    vec2 pixCoord = gl_FragCoord.xy;
+    float probAdd = 0.0; // extra probability boost when inside a ball
     for (int i = 0; i < 9; ++i) {
-        vec2 ballCenter = u_ballPos[i] * u_resolution; // normalized positions scaled to pixels
+        vec2 ballCenter = u_ballPos[i]; // pixel coordinates
         float dist = length(pixCoord - ballCenter);
         if (dist < u_ballRadius) {
-            // Ball color (distinct from noise)
-            color = vec4(250.0/255.0, 150.0/255.0, 10.0/255.0, 1.0);
+            probAdd = 0.03; // increase chance of light color
         }
+    }
+    // Apply noise threshold with possible boost from balls
+    if (n < noiseThresh + probAdd) {
+        color = vec4(10.0/255.0, 250.0/255.0, 10.0/255.0, 1.0);
     }
     gl_FragColor = color;
 }
