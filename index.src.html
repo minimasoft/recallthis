@@ -29,7 +29,6 @@ void main(){
 <script type="x-shader/x-fragment" id="fragment-shader">
 precision highp float;
 uniform float u_seed;
-uniform vec2 u_resolution;
 uniform sampler2D u_textTex;
 uniform float u_dataProb;
 uniform float u_noiseProb;
@@ -62,7 +61,6 @@ function startApp(){
     const canvas=document.getElementById('glcanvas');
     const gl=canvas.getContext('webgl')||canvas.getContext('experimental-webgl');
     if(!gl){ console.error('WebGL not supported'); return; }
-    let uResLocation=null;
     const hiddenCanvas=document.createElement('canvas');
     const hiddenCtx=hiddenCanvas.getContext('2d');
     const FONT_SIZE_PX=40;
@@ -127,7 +125,6 @@ function startApp(){
         gl.viewport(0,0,canvas.width,canvas.height);
         canvasWidth=canvas.width; canvasHeight=canvas.height;
         if(!ballPos[0][0]) initBalls();
-        if(uResLocation) gl.uniform2f(uResLocation,canvas.width,canvas.height);
         hiddenCanvas.width=canvasWidth; hiddenCanvas.height=canvasHeight;
         renderTextBuffer();
     }
@@ -147,52 +144,6 @@ function startApp(){
         return sh;
     }
 
-    function initGL(gl){
-        const vsSource=document.getElementById('vertex-shader').textContent;
-        const fsSource=document.getElementById('fragment-shader').textContent;
-        const vertexShader=compile(gl.VERTEX_SHADER,vsSource);
-        const fragmentShader=compile(gl.FRAGMENT_SHADER,fsSource);
-        const program=gl.createProgram();
-        gl.attachShader(program,vertexShader);
-        gl.attachShader(program,fragmentShader);
-        gl.linkProgram(program);
-        if(!gl.getProgramParameter(program,gl.LINK_STATUS)){
-            console.error('Link error:',gl.getProgramInfoLog(program));
-            return null;
-        }
-        gl.useProgram(program);
-        const uSeedLocation=gl.getUniformLocation(program,'u_seed');
-        const uResLocation=gl.getUniformLocation(program,'u_resolution');
-        const uBallPosLocation=gl.getUniformLocation(program,'u_ballPos[0]');
-        const uBallRadiusLocation=gl.getUniformLocation(program,'u_ballRadius');
-        const uTextTexLocation=gl.getUniformLocation(program,'u_textTex');
-        const uDataProbLocation=gl.getUniformLocation(program,'u_dataProb');
-        const uNoiseProbLocation=gl.getUniformLocation(program,'u_noiseProb');
-        const uBallProbLocation=gl.getUniformLocation(program,'u_ballProb');
-        const textTexture=gl.createTexture();
-        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
-        gl.bindTexture(gl.TEXTURE_2D,texture);
-        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-        gl.useProgram(program);
-        gl.uniform1f(uDataProbLocation,0.037);
-        gl.uniform1f(uNoiseProbLocation,0.0011);
-        gl.uniform1f(uBallProbLocation,0.079);
-        return {
-            program,
-            uSeedLocation,
-            uResLocation,
-            uBallPosLocation,
-            uBallRadiusLocation,
-            uTextTexLocation,
-            uDataProbLocation,
-            uNoiseProbLocation,
-            uBallProbLocation,
-            textTexture
-        };
-    }
     const vertexShader=compile(gl.VERTEX_SHADER,vsSource);
     const fragmentShader=compile(gl.FRAGMENT_SHADER,fsSource);
     const program=gl.createProgram();
@@ -202,7 +153,6 @@ function startApp(){
     if(!gl.getProgramParameter(program,gl.LINK_STATUS)){ console.error('Link error:',gl.getProgramInfoLog(program)); return; }
     gl.useProgram(program);
     const uSeedLocation=gl.getUniformLocation(program,'u_seed');
-    uResLocation=gl.getUniformLocation(program,'u_resolution');
     const uBallPosLocation=gl.getUniformLocation(program,'u_ballPos[0]');
     const uBallRadiusLocation=gl.getUniformLocation(program,'u_ballRadius');
     const uTextTexLocation=gl.getUniformLocation(program,'u_textTex');
