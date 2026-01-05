@@ -19,40 +19,40 @@ html, body {
 <body>
 <canvas id="glcanvas"></canvas>
 <script type="x-shader/x-vertex" id="vertex-shader">
-attribute vec2 a_position;
-varying vec2 v_uv;
+attribute vec2 a;
+varying vec2 v;
 void main(){
-  v_uv = (a_position + 1.0) * 0.5;
-  gl_Position = vec4(a_position, 0.0, 1.0);
+  v = (a + 1.0) * 0.5;
+  gl_Position = vec4(a, 0.0, 1.0);
 }
 </script>
 <script type="x-shader/x-fragment" id="fragment-shader">
 precision highp float;
-uniform float u_seed;
-uniform sampler2D u_textTex;
-uniform float u_dataProb;
-uniform float u_noiseProb;
-uniform float u_ballProb;
+uniform float u;
+uniform sampler2D t;
+uniform float d;
+uniform float n;
+uniform float b;
 const int BALL_COUNT = 9;
-uniform vec2 u_ballPos[BALL_COUNT];
-uniform float u_ballRadius;
-varying vec2 v_uv;
+uniform vec2 p[BALL_COUNT];
+uniform float r;
+varying vec2 v;
 float hash(vec2 p){ return fract(sin(dot(p, vec2(27.9831,58.5437))) * 43758.5453942); }
 void main(){
     vec4 baseColor = vec4(0.0,14.0/255.0,0.0,1.0);
-    vec2 coord = v_uv + vec2(u_seed,u_seed);
-    float n = hash(coord);
-    float texVal = texture2D(u_textTex,vec2(v_uv.x,1.0-v_uv.y)).r;
-    float prob = u_noiseProb + texVal * u_dataProb;
+    vec2 coord = v + vec2(u,u);
+    float pn = hash(coord);
+    float texVal = texture2D(t,vec2(v.x,1.0-v.y)).r;
+    float prob = n + texVal * d;
     vec4 color = baseColor;
     vec2 pixCoord = gl_FragCoord.xy;
     for(int i=0;i<BALL_COUNT;++i){
-        float dist = length(pixCoord - u_ballPos[i]);
-        if(dist < u_ballRadius){
-            prob += u_ballProb * (1.0 / max(1.0, dist/3.14159));
+        float dist = length(pixCoord - p[i]);
+        if(dist < r){
+            prob += b * (1.0 / max(1.0, dist/3.14159));
         }
     }
-    if(n < prob) { color = vec4(10.0/255.0,250.0/255.0,10.0/255.0,1.0); }
+    if(pn < prob) { color = vec4(10.0/255.0,250.0/255.0,10.0/255.0,1.0); }
     gl_FragColor = color;
 }
 </script>
@@ -60,7 +60,6 @@ void main(){
 function startApp(){
     const canvas=document.getElementById('glcanvas');
     const gl=canvas.getContext('webgl')||canvas.getContext('experimental-webgl');
-    if(!gl){ console.error('WebGL not supported'); return; }
     const hiddenCanvas=document.createElement('canvas');
     const hiddenCtx=hiddenCanvas.getContext('2d');
     const FONT_SIZE_PX=40;
@@ -152,13 +151,13 @@ function startApp(){
     gl.linkProgram(program);
     if(!gl.getProgramParameter(program,gl.LINK_STATUS)){ console.error('Link error:',gl.getProgramInfoLog(program)); return; }
     gl.useProgram(program);
-    const uSeedLocation=gl.getUniformLocation(program,'u_seed');
-    const uBallPosLocation=gl.getUniformLocation(program,'u_ballPos[0]');
-    const uBallRadiusLocation=gl.getUniformLocation(program,'u_ballRadius');
-    const uTextTexLocation=gl.getUniformLocation(program,'u_textTex');
-    const uDataProbLocation=gl.getUniformLocation(program,'u_dataProb');
-    const uNoiseProbLocation=gl.getUniformLocation(program,'u_noiseProb');
-    const uBallProbLocation=gl.getUniformLocation(program,'u_ballProb');
+    const uLocation=gl.getUniformLocation(program,'u');
+    const uBallPosLocation=gl.getUniformLocation(program,'p[0]');
+    const uBallRadiusLocation=gl.getUniformLocation(program,'r');
+    const uTextTexLocation=gl.getUniformLocation(program,'t');
+    const uDataProbLocation=gl.getUniformLocation(program,'d');
+    const uNoiseProbLocation=gl.getUniformLocation(program,'n');
+    const uBallProbLocation=gl.getUniformLocation(program,'b');
     const textTexture=gl.createTexture();
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
     gl.bindTexture(gl.TEXTURE_2D,textTexture);
@@ -174,7 +173,7 @@ function startApp(){
     const buffer=gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
     gl.bufferData(gl.ARRAY_BUFFER,vertices,gl.STATIC_DRAW);
-    const loc=gl.getAttribLocation(program,'a_position');
+    const loc=gl.getAttribLocation(program,'a');
     gl.enableVertexAttribArray(loc);
     gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
     function render(){
@@ -192,7 +191,7 @@ function startApp(){
         gl.uniform1i(uTextTexLocation,0);
         gl.clear(gl.COLOR_BUFFER_BIT);
         let seed=performance.now()/1337.0; seed-=Math.floor(seed);
-        gl.uniform1f(uSeedLocation,seed);
+        gl.uniform1f(uLocation,seed);
         gl.drawArrays(gl.TRIANGLES,0,6);
         requestAnimationFrame(render);
     }
