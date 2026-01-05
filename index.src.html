@@ -28,14 +28,9 @@ void main(){
 </script>
 <script type="x-shader/x-fragment" id="fragment-shader">
 precision highp float;
-uniform float u;
 uniform sampler2D t;
-uniform float d;
-uniform float n;
-uniform float b;
-const int BALL_COUNT = 9;
-uniform vec2 p[BALL_COUNT];
-uniform float r;
+uniform float u,d,n,b,r;
+uniform vec2 p[9];
 varying vec2 v;
 float hash(vec2 p){ return fract(sin(dot(p, vec2(27.9831,58.5437))) * 43758.5453942); }
 void main(){
@@ -46,7 +41,7 @@ void main(){
     float prob = n + texVal * d;
     vec4 color = baseColor;
     vec2 pixCoord = gl_FragCoord.xy;
-    for(int i=0;i<BALL_COUNT;++i){
+    for(int i=0;i<9;++i){
         float dist = length(pixCoord - p[i]);
         if(dist < r){
             prob += b * (1.0 / max(1.0, dist/3.14159));
@@ -63,8 +58,6 @@ function startApp(){
     const hiddenCanvas=document.createElement('canvas');
     const hiddenCtx=hiddenCanvas.getContext('2d');
     const FONT_SIZE_PX=40;
-    function setFont(){ hiddenCtx.font=`${FONT_SIZE_PX}px monospace`; }
-    setFont();
     hiddenCtx.textBaseline='top';
     let textStartLine=0;
     function wrapText(text,maxWidth){
@@ -97,7 +90,7 @@ function startApp(){
     const SAMPLE_TEXT=`¿Cómo vas a tener un slogan como el de «la libertad es la esclavitud» cuando el concepto de libertad no exista?\n\nTodo el clima del pensamiento será distinto.\n\n En realidad, no habrá pensamiento en el sentido en que ahora lo entendemos.\n\nLa ortodoxia significa no pensar, no necesitar el pensamiento.\n\nNuestra ortodoxia es la inconsciencia.`;
     function renderTextBuffer(){
         hiddenCtx.clearRect(0,0,hiddenCanvas.width,hiddenCanvas.height);
-        setFont();
+        hiddenCtx.font=`${FONT_SIZE_PX}px monospace`;
         const maxWidth=hiddenCanvas.width-20;
         const lines=wrapText(SAMPLE_TEXT,maxWidth);
         hiddenCtx.fillStyle='#ff0000';
@@ -149,7 +142,6 @@ function startApp(){
     gl.attachShader(program,vertexShader);
     gl.attachShader(program,fragmentShader);
     gl.linkProgram(program);
-    if(!gl.getProgramParameter(program,gl.LINK_STATUS)){ console.error('Link error:',gl.getProgramInfoLog(program)); return; }
     gl.useProgram(program);
     const uLocation=gl.getUniformLocation(program,'u');
     const uBallPosLocation=gl.getUniformLocation(program,'p[0]');
